@@ -143,6 +143,7 @@ export class NetworkManager {
         break;
 
       case MessageType.GAME_START:
+        console.log('[GAME_START] Game starting! Map:', message.mapId, 'SpawnPoint:', message.yourSpawnPoint);
         useGameStore.getState().setIsPlaying(true);
         break;
 
@@ -162,6 +163,11 @@ export class NetworkManager {
   private handleGameState(message: any): void {
     const store = useGameStore.getState();
     const snapshot = message.snapshot;
+
+    // Debug log
+    if (snapshot.players.length > 1) {
+      console.log('[GAME_STATE] Players:', snapshot.players.length, 'LocalID:', store.localPlayerId);
+    }
 
     // Update players
     const playersMap = new Map();

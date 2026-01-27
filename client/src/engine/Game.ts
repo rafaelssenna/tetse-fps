@@ -494,12 +494,21 @@ export class Game {
     const store = useGameStore.getState();
     const players = store.players;
 
+    // Debug: log once when we have other players
+    if (players.size > 1 && this.remotePlayers.size === 0) {
+      console.log('[Game] Found players:', players.size, 'localId:', store.localPlayerId);
+      players.forEach((p, id) => {
+        console.log('[Game] Player:', id, 'isLocal:', id === store.localPlayerId, 'pos:', p.position);
+      });
+    }
+
     // Update or create remote players
     players.forEach((playerState, playerId) => {
       if (playerId === store.localPlayerId) return;
 
       let remotePlayer = this.remotePlayers.get(playerId);
       if (!remotePlayer) {
+        console.log('[Game] Creating RemotePlayer for:', playerId, 'at pos:', playerState.position);
         const character = CHARACTERS[playerState.characterId];
         remotePlayer = new RemotePlayer(
           this.scene,
