@@ -29,6 +29,7 @@ export class RemotePlayer {
   }> = [];
 
   private isAlive = true;
+  private hasReceivedFirstState = false;
 
   constructor(scene: Scene, id: string, color: string) {
     this.scene = scene;
@@ -163,9 +164,23 @@ export class RemotePlayer {
   }
 
   updateState(state: PlayerState): void {
+    const newPosition = new Vector3(state.position.x, state.position.y, state.position.z);
+
+    // On first state, set position immediately (no interpolation)
+    if (!this.hasReceivedFirstState) {
+      this.hasReceivedFirstState = true;
+      this.currentPosition = newPosition.clone();
+      this.targetPosition = newPosition.clone();
+      this.currentRotation = state.rotation.x;
+      this.targetRotation = state.rotation.x;
+      this.root.position.copyFrom(this.currentPosition);
+      this.root.rotation.y = this.currentRotation;
+      console.log('[RemotePlayer] First state received, position:', state.position);
+    }
+
     // Add to interpolation buffer
     this.interpolationBuffer.push({
-      position: new Vector3(state.position.x, state.position.y, state.position.z),
+      position: newPosition,
       rotation: state.rotation.x,
       timestamp: Date.now(),
     });
