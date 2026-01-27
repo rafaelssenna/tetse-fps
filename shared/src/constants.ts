@@ -1,4 +1,4 @@
-import { Character, CharacterId, MapData, MapId } from './types';
+import { Character, CharacterId, MapData, MapId } from './types.js';
 
 // ===== Configurações de Rede =====
 export const NETWORK = {

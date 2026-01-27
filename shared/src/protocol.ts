@@ -7,7 +7,7 @@ import {
   PlayerId,
   RoomId,
   Vec3
-} from './types';
+} from './types.js';
 
 // ===== Tipos de Mensagem =====
 export enum MessageType {

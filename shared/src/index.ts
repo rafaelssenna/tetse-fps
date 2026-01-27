@@ -1,4 +1,4 @@
 // Re-export tudo
-export * from './types';
-export * from './constants';
-export * from './protocol';
+export * from './types.js';
+export * from './constants.js';
+export * from './protocol.js';
