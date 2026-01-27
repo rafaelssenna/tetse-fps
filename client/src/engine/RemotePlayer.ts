@@ -15,6 +15,7 @@ export class RemotePlayer {
   private root: TransformNode;
   private bodyMesh: Mesh;
   private headMesh: Mesh;
+  private allMeshes: Mesh[] = [];
 
   // Interpolation
   private targetPosition: Vector3 = Vector3.Zero();
@@ -36,31 +37,127 @@ export class RemotePlayer {
     // Create root node
     this.root = new TransformNode(`player_${id}`, scene);
 
-    // Create body
-    this.bodyMesh = MeshBuilder.CreateCylinder(`body_${id}`, {
-      diameter: PLAYER.RADIUS * 2,
-      height: PLAYER.HEIGHT - 0.4,
-    }, scene);
-    this.bodyMesh.parent = this.root;
-    this.bodyMesh.position.y = (PLAYER.HEIGHT - 0.4) / 2;
+    // Materials
+    const bodyColor = Color3.FromHexString(color);
+    const darkColor = bodyColor.scale(0.6);
+    const skinColor = new Color3(0.9, 0.75, 0.6);
 
     const bodyMat = new StandardMaterial(`bodyMat_${id}`, scene);
-    bodyMat.diffuseColor = Color3.FromHexString(color);
-    bodyMat.specularColor = new Color3(0.2, 0.2, 0.2);
+    bodyMat.diffuseColor = bodyColor;
+    bodyMat.specularColor = new Color3(0.15, 0.15, 0.15);
+
+    const darkMat = new StandardMaterial(`darkMat_${id}`, scene);
+    darkMat.diffuseColor = darkColor;
+    darkMat.specularColor = new Color3(0.1, 0.1, 0.1);
+
+    const skinMat = new StandardMaterial(`skinMat_${id}`, scene);
+    skinMat.diffuseColor = skinColor;
+    skinMat.specularColor = new Color3(0.1, 0.1, 0.1);
+
+    const metalMat = new StandardMaterial(`metalMat_${id}`, scene);
+    metalMat.diffuseColor = new Color3(0.2, 0.2, 0.22);
+    metalMat.specularColor = new Color3(0.3, 0.3, 0.3);
+
+    // Create torso
+    this.bodyMesh = MeshBuilder.CreateBox(`torso_${id}`, {
+      width: 0.5,
+      height: 0.7,
+      depth: 0.3,
+    }, scene);
+    this.bodyMesh.parent = this.root;
+    this.bodyMesh.position.y = 1.1;
     this.bodyMesh.material = bodyMat;
+    this.allMeshes.push(this.bodyMesh);
 
     // Create head
-    this.headMesh = MeshBuilder.CreateSphere(`head_${id}`, {
-      diameter: 0.4,
+    this.headMesh = MeshBuilder.CreateBox(`head_${id}`, {
+      width: 0.3,
+      height: 0.35,
+      depth: 0.3,
     }, scene);
     this.headMesh.parent = this.root;
-    this.headMesh.position.y = PLAYER.HEIGHT - 0.2;
+    this.headMesh.position.y = 1.65;
+    this.headMesh.material = skinMat;
+    this.allMeshes.push(this.headMesh);
 
-    const headMat = new StandardMaterial(`headMat_${id}`, scene);
-    headMat.diffuseColor = Color3.FromHexString(color).scale(0.8);
-    this.headMesh.material = headMat;
+    // Helmet/hat
+    const helmet = MeshBuilder.CreateBox(`helmet_${id}`, {
+      width: 0.35,
+      height: 0.15,
+      depth: 0.35,
+    }, scene);
+    helmet.parent = this.root;
+    helmet.position.y = 1.85;
+    helmet.material = darkMat;
+    this.allMeshes.push(helmet);
 
-    // Enable collisions
+    // Legs
+    const leftLeg = MeshBuilder.CreateBox(`leftLeg_${id}`, {
+      width: 0.15,
+      height: 0.6,
+      depth: 0.15,
+    }, scene);
+    leftLeg.parent = this.root;
+    leftLeg.position = new Vector3(-0.12, 0.4, 0);
+    leftLeg.material = darkMat;
+    this.allMeshes.push(leftLeg);
+
+    const rightLeg = MeshBuilder.CreateBox(`rightLeg_${id}`, {
+      width: 0.15,
+      height: 0.6,
+      depth: 0.15,
+    }, scene);
+    rightLeg.parent = this.root;
+    rightLeg.position = new Vector3(0.12, 0.4, 0);
+    rightLeg.material = darkMat;
+    this.allMeshes.push(rightLeg);
+
+    // Arms
+    const leftArm = MeshBuilder.CreateBox(`leftArm_${id}`, {
+      width: 0.12,
+      height: 0.5,
+      depth: 0.12,
+    }, scene);
+    leftArm.parent = this.root;
+    leftArm.position = new Vector3(-0.35, 1.0, 0.1);
+    leftArm.rotation.x = -0.3;
+    leftArm.material = bodyMat;
+    this.allMeshes.push(leftArm);
+
+    const rightArm = MeshBuilder.CreateBox(`rightArm_${id}`, {
+      width: 0.12,
+      height: 0.5,
+      depth: 0.12,
+    }, scene);
+    rightArm.parent = this.root;
+    rightArm.position = new Vector3(0.35, 1.0, 0.15);
+    rightArm.rotation.x = -0.5;
+    rightArm.material = bodyMat;
+    this.allMeshes.push(rightArm);
+
+    // Gun
+    const gun = MeshBuilder.CreateBox(`gun_${id}`, {
+      width: 0.08,
+      height: 0.1,
+      depth: 0.4,
+    }, scene);
+    gun.parent = this.root;
+    gun.position = new Vector3(0.35, 0.95, 0.4);
+    gun.material = metalMat;
+    this.allMeshes.push(gun);
+
+    // Gun barrel
+    const barrel = MeshBuilder.CreateCylinder(`barrel_${id}`, {
+      diameter: 0.04,
+      height: 0.25,
+    }, scene);
+    barrel.parent = this.root;
+    barrel.rotation.x = Math.PI / 2;
+    barrel.position = new Vector3(0.35, 0.97, 0.7);
+    barrel.material = metalMat;
+    this.allMeshes.push(barrel);
+
+    // Enable collisions only on main meshes
     this.bodyMesh.checkCollisions = true;
     this.headMesh.checkCollisions = true;
   }
@@ -140,8 +237,9 @@ export class RemotePlayer {
   }
 
   private setVisible(visible: boolean): void {
-    this.bodyMesh.isVisible = visible;
-    this.headMesh.isVisible = visible;
+    this.allMeshes.forEach(mesh => {
+      mesh.isVisible = visible;
+    });
   }
 
   getPosition(): Vector3 {
@@ -149,8 +247,7 @@ export class RemotePlayer {
   }
 
   dispose(): void {
-    this.bodyMesh.dispose();
-    this.headMesh.dispose();
+    this.allMeshes.forEach(mesh => mesh.dispose());
     this.root.dispose();
   }
 }

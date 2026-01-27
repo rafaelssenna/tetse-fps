@@ -4,12 +4,14 @@ import {
   FreeCamera,
   Vector3,
   HemisphericLight,
+  DirectionalLight,
   MeshBuilder,
   StandardMaterial,
   Color3,
   Color4,
   Mesh,
   PointerEventTypes,
+  DynamicTexture,
 } from '@babylonjs/core';
 import { PLAYER, WEAPON, MAPS, MapId, CHARACTERS } from 'shared';
 import { InputManager } from './InputManager';
@@ -72,51 +74,134 @@ export class Game {
   }
 
   private setupLighting(): void {
-    const light = new HemisphericLight('light', new Vector3(0, 1, 0), this.scene);
-    light.intensity = 0.9;
-    light.groundColor = new Color3(0.3, 0.3, 0.4);
+    // Ambient light
+    const ambient = new HemisphericLight('ambient', new Vector3(0, 1, 0), this.scene);
+    ambient.intensity = 0.6;
+    ambient.groundColor = new Color3(0.2, 0.2, 0.3);
+
+    // Directional light (sun)
+    const sun = new DirectionalLight('sun', new Vector3(-0.5, -1, -0.5), this.scene);
+    sun.intensity = 0.8;
+    sun.diffuse = new Color3(1, 0.95, 0.8);
   }
 
   private buildMap(): void {
     const store = useGameStore.getState();
     const mapId = store.currentMapId || 'warehouse';
 
-    // Create ground
+    // Create ground with texture
     const ground = MeshBuilder.CreateGround('ground', {
-      width: 50,
-      height: 50,
+      width: 60,
+      height: 60,
     }, this.scene);
     const groundMat = new StandardMaterial('groundMat', this.scene);
-    groundMat.diffuseColor = new Color3(0.3, 0.3, 0.35);
-    groundMat.specularColor = new Color3(0.1, 0.1, 0.1);
+
+    // Create procedural concrete texture
+    const groundTexture = this.createConcreteTexture('groundTex', 512);
+    groundMat.diffuseTexture = groundTexture;
+    groundMat.specularColor = new Color3(0.15, 0.15, 0.15);
     ground.material = groundMat;
     ground.checkCollisions = true;
 
-    // Create walls/boundaries
-    this.createWall(-25, 2.5, 0, 1, 5, 50); // Left wall
-    this.createWall(25, 2.5, 0, 1, 5, 50);  // Right wall
-    this.createWall(0, 2.5, -25, 50, 5, 1); // Back wall
-    this.createWall(0, 2.5, 25, 50, 5, 1);  // Front wall
+    // Create walls/boundaries with brick texture
+    this.createWall(-30, 3, 0, 1, 6, 60); // Left wall
+    this.createWall(30, 3, 0, 1, 6, 60);  // Right wall
+    this.createWall(0, 3, -30, 60, 6, 1); // Back wall
+    this.createWall(0, 3, 30, 60, 6, 1);  // Front wall
 
     // Create some obstacles based on map
     this.createMapObstacles(mapId);
 
-    // Create skybox effect (simple)
+    // Skybox effect
+    this.scene.clearColor = new Color4(0.4, 0.6, 0.9, 1);
     this.scene.fogMode = Scene.FOGMODE_EXP2;
-    this.scene.fogDensity = 0.005;
-    this.scene.fogColor = new Color3(0.5, 0.7, 0.9);
+    this.scene.fogDensity = 0.008;
+    this.scene.fogColor = new Color3(0.4, 0.6, 0.9);
+
+    // Ambient occlusion simulation
+    this.scene.ambientColor = new Color3(0.3, 0.3, 0.35);
   }
 
+  private createConcreteTexture(name: string, size: number): DynamicTexture {
+    const texture = new DynamicTexture(name, size, this.scene, true);
+    const ctx = texture.getContext();
+
+    // Base color
+    ctx.fillStyle = '#4a4a50';
+    ctx.fillRect(0, 0, size, size);
+
+    // Add noise/grain
+    for (let i = 0; i < 5000; i++) {
+      const x = Math.random() * size;
+      const y = Math.random() * size;
+      const gray = Math.floor(60 + Math.random() * 40);
+      ctx.fillStyle = `rgb(${gray}, ${gray}, ${gray + 5})`;
+      ctx.fillRect(x, y, 2, 2);
+    }
+
+    // Add cracks/lines
+    ctx.strokeStyle = '#3a3a40';
+    ctx.lineWidth = 1;
+    for (let i = 0; i < 10; i++) {
+      ctx.beginPath();
+      ctx.moveTo(Math.random() * size, Math.random() * size);
+      ctx.lineTo(Math.random() * size, Math.random() * size);
+      ctx.stroke();
+    }
+
+    texture.update();
+    texture.uScale = 8;
+    texture.vScale = 8;
+    return texture;
+  }
+
+  private createBrickTexture(name: string, size: number): DynamicTexture {
+    const texture = new DynamicTexture(name, size, this.scene, true);
+    const ctx = texture.getContext();
+
+    const brickWidth = size / 4;
+    const brickHeight = size / 8;
+    const mortarSize = 4;
+
+    // Mortar color
+    ctx.fillStyle = '#5a5a5a';
+    ctx.fillRect(0, 0, size, size);
+
+    // Draw bricks
+    for (let row = 0; row < 8; row++) {
+      const offset = (row % 2) * (brickWidth / 2);
+      for (let col = -1; col < 5; col++) {
+        const x = col * brickWidth + offset;
+        const y = row * brickHeight;
+
+        // Brick color variation
+        const r = 100 + Math.floor(Math.random() * 30);
+        const g = 70 + Math.floor(Math.random() * 20);
+        const b = 60 + Math.floor(Math.random() * 15);
+        ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
+        ctx.fillRect(x + mortarSize/2, y + mortarSize/2, brickWidth - mortarSize, brickHeight - mortarSize);
+      }
+    }
+
+    texture.update();
+    texture.uScale = 4;
+    texture.vScale = 2;
+    return texture;
+  }
+
+  private wallCounter = 0;
+
   private createWall(x: number, y: number, z: number, w: number, h: number, d: number): Mesh {
-    const wall = MeshBuilder.CreateBox('wall', {
+    const wall = MeshBuilder.CreateBox(`wall${this.wallCounter++}`, {
       width: w,
       height: h,
       depth: d,
     }, this.scene);
     wall.position = new Vector3(x, y, z);
 
-    const wallMat = new StandardMaterial('wallMat', this.scene);
-    wallMat.diffuseColor = new Color3(0.4, 0.4, 0.45);
+    const wallMat = new StandardMaterial(`wallMat${this.wallCounter}`, this.scene);
+    wallMat.diffuseTexture = this.createBrickTexture(`wallTex${this.wallCounter}`, 256);
+    wallMat.specularColor = new Color3(0.1, 0.1, 0.1);
     wall.material = wallMat;
     wall.checkCollisions = true;
 
@@ -138,24 +223,131 @@ export class Game {
   }
 
   private createWarehouseObstacles(): void {
-    // Central crates
-    this.createBox(-5, 1, -5, 2, 2, 2, new Color3(0.6, 0.4, 0.2));
-    this.createBox(-5, 3, -5, 2, 2, 2, new Color3(0.6, 0.4, 0.2));
-    this.createBox(5, 1, -5, 2, 2, 2, new Color3(0.6, 0.4, 0.2));
-    this.createBox(5, 1, 5, 2, 2, 2, new Color3(0.6, 0.4, 0.2));
-    this.createBox(-5, 1, 5, 2, 2, 2, new Color3(0.6, 0.4, 0.2));
+    // Wooden crate color
+    const crateColor = new Color3(0.55, 0.35, 0.15);
+    const metalColor = new Color3(0.4, 0.4, 0.45);
+    const platformColor = new Color3(0.3, 0.3, 0.35);
 
-    // Shelving units
-    this.createBox(-15, 2.5, 0, 1, 5, 10, new Color3(0.5, 0.5, 0.5));
-    this.createBox(15, 2.5, 0, 1, 5, 10, new Color3(0.5, 0.5, 0.5));
+    // Central crates - stacked
+    this.createCrate(-6, 1, -6, 2);
+    this.createCrate(-6, 3, -6, 2);
+    this.createCrate(-4, 1, -6, 2);
+    this.createCrate(6, 1, -6, 2);
+    this.createCrate(6, 1, -4, 2);
+    this.createCrate(6, 1, 6, 2);
+    this.createCrate(-6, 1, 6, 2);
+    this.createCrate(-6, 1, 4, 2);
 
-    // Platform in center
-    this.createBox(0, 0.5, 0, 6, 1, 6, new Color3(0.35, 0.35, 0.4));
-    this.createBox(0, 2.5, 0, 4, 0.3, 4, new Color3(0.4, 0.4, 0.45));
+    // Shelving units with multiple levels
+    this.createBox(-18, 2.5, 0, 1.5, 5, 12, metalColor);
+    this.createBox(-18, 1, 0, 2, 0.2, 12, metalColor);
+    this.createBox(-18, 3, 0, 2, 0.2, 12, metalColor);
 
-    // Ramps
-    this.createRamp(-8, 1.25, 0, 4, 2.5, 2);
-    this.createRamp(8, 1.25, 0, 4, 2.5, 2, Math.PI);
+    this.createBox(18, 2.5, 0, 1.5, 5, 12, metalColor);
+    this.createBox(18, 1, 0, 2, 0.2, 12, metalColor);
+    this.createBox(18, 3, 0, 2, 0.2, 12, metalColor);
+
+    // Central elevated platform
+    this.createBox(0, 0.5, 0, 8, 1, 8, platformColor);
+    this.createBox(0, 3, 0, 5, 0.3, 5, platformColor);
+
+    // Support pillars for elevated platform
+    this.createBox(-2.2, 1.65, -2.2, 0.4, 2.3, 0.4, metalColor);
+    this.createBox(2.2, 1.65, -2.2, 0.4, 2.3, 0.4, metalColor);
+    this.createBox(-2.2, 1.65, 2.2, 0.4, 2.3, 0.4, metalColor);
+    this.createBox(2.2, 1.65, 2.2, 0.4, 2.3, 0.4, metalColor);
+
+    // Ramps to platform
+    this.createRamp(-6, 1.65, 0, 5, 0.3, 3);
+    this.createRamp(6, 1.65, 0, 5, 0.3, 3, Math.PI);
+
+    // Cover walls
+    this.createBox(-10, 1, -10, 0.3, 2, 4, metalColor);
+    this.createBox(10, 1, -10, 0.3, 2, 4, metalColor);
+    this.createBox(-10, 1, 10, 0.3, 2, 4, metalColor);
+    this.createBox(10, 1, 10, 0.3, 2, 4, metalColor);
+
+    // Corner crates for spawn protection
+    this.createCrate(-22, 1, -22, 2.5);
+    this.createCrate(22, 1, -22, 2.5);
+    this.createCrate(-22, 1, 22, 2.5);
+    this.createCrate(22, 1, 22, 2.5);
+
+    // Barrels
+    this.createBarrel(-12, 0.75, -12);
+    this.createBarrel(-12.8, 0.75, -11.5);
+    this.createBarrel(12, 0.75, 12);
+    this.createBarrel(11.2, 0.75, 11.5);
+  }
+
+  private createCrate(x: number, y: number, z: number, size: number): Mesh {
+    const crate = MeshBuilder.CreateBox(`crate${x}${z}`, {
+      width: size,
+      height: size,
+      depth: size,
+    }, this.scene);
+    crate.position = new Vector3(x, y, z);
+
+    const crateMat = new StandardMaterial(`crateMat${x}${z}`, this.scene);
+    crateMat.diffuseTexture = this.createCrateTexture(`crateTex${x}${z}`, 128);
+    crateMat.specularColor = new Color3(0.1, 0.1, 0.1);
+    crate.material = crateMat;
+    crate.checkCollisions = true;
+
+    return crate;
+  }
+
+  private createCrateTexture(name: string, size: number): DynamicTexture {
+    const texture = new DynamicTexture(name, size, this.scene, true);
+    const ctx = texture.getContext();
+
+    // Wood base color
+    ctx.fillStyle = '#8B6914';
+    ctx.fillRect(0, 0, size, size);
+
+    // Wood grain
+    ctx.strokeStyle = '#6B4914';
+    ctx.lineWidth = 2;
+    for (let i = 0; i < 15; i++) {
+      const y = Math.random() * size;
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(size, y + (Math.random() - 0.5) * 20);
+      ctx.stroke();
+    }
+
+    // Crate frame/edges
+    ctx.strokeStyle = '#4a3010';
+    ctx.lineWidth = 8;
+    ctx.strokeRect(4, 4, size - 8, size - 8);
+
+    // Cross pattern
+    ctx.lineWidth = 6;
+    ctx.beginPath();
+    ctx.moveTo(size * 0.1, size * 0.1);
+    ctx.lineTo(size * 0.9, size * 0.9);
+    ctx.moveTo(size * 0.9, size * 0.1);
+    ctx.lineTo(size * 0.1, size * 0.9);
+    ctx.stroke();
+
+    texture.update();
+    return texture;
+  }
+
+  private createBarrel(x: number, y: number, z: number): Mesh {
+    const barrel = MeshBuilder.CreateCylinder(`barrel${x}${z}`, {
+      diameter: 1,
+      height: 1.5,
+    }, this.scene);
+    barrel.position = new Vector3(x, y, z);
+
+    const barrelMat = new StandardMaterial(`barrelMat${x}${z}`, this.scene);
+    barrelMat.diffuseColor = new Color3(0.3, 0.5, 0.3);
+    barrelMat.specularColor = new Color3(0.2, 0.2, 0.2);
+    barrel.material = barrelMat;
+    barrel.checkCollisions = true;
+
+    return barrel;
   }
 
   private createArenaObstacles(): void {

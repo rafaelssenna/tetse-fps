@@ -11,6 +11,27 @@ const styles: Record<string, React.CSSProperties> = {
     pointerEvents: 'none',
     padding: '1rem',
   },
+  crosshair: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    transform: 'translate(-50%, -50%)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  crosshairLine: {
+    position: 'absolute',
+    background: 'rgba(255, 255, 255, 0.9)',
+    boxShadow: '0 0 2px rgba(0, 0, 0, 0.8)',
+  },
+  crosshairDot: {
+    width: '4px',
+    height: '4px',
+    borderRadius: '50%',
+    background: 'rgba(255, 255, 255, 0.9)',
+    boxShadow: '0 0 2px rgba(0, 0, 0, 0.8)',
+  },
   topBar: {
     display: 'flex',
     justifyContent: 'center',
@@ -130,6 +151,40 @@ function HUD() {
 
   return (
     <div style={styles.container}>
+      {/* Crosshair */}
+      <div style={styles.crosshair}>
+        {/* Center dot */}
+        <div style={styles.crosshairDot} />
+        {/* Top line */}
+        <div style={{
+          ...styles.crosshairLine,
+          width: '2px',
+          height: '12px',
+          top: '-18px',
+        }} />
+        {/* Bottom line */}
+        <div style={{
+          ...styles.crosshairLine,
+          width: '2px',
+          height: '12px',
+          bottom: '-18px',
+        }} />
+        {/* Left line */}
+        <div style={{
+          ...styles.crosshairLine,
+          width: '12px',
+          height: '2px',
+          left: '-18px',
+        }} />
+        {/* Right line */}
+        <div style={{
+          ...styles.crosshairLine,
+          width: '12px',
+          height: '2px',
+          right: '-18px',
+        }} />
+      </div>
+
       {/* Timer */}
       <div style={styles.topBar}>
         <div style={styles.timer}>{formatTime(timeRemaining)}</div>

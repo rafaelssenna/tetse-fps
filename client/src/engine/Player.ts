@@ -33,25 +33,132 @@ export class Player {
   }
 
   private createWeaponMesh(): Mesh {
-    // Simple gun shape
-    const gun = MeshBuilder.CreateBox('gun', {
-      width: 0.1,
-      height: 0.1,
-      depth: 0.5,
+    // Create a more detailed gun shape
+    const gunParent = new Mesh('gunParent', this.scene);
+    gunParent.parent = this.camera;
+    gunParent.position = new Vector3(0.35, -0.25, 0.6);
+    gunParent.rotation = new Vector3(0, 0, 0);
+
+    // Gun materials
+    const metalMat = new StandardMaterial('metalMat', this.scene);
+    metalMat.diffuseColor = new Color3(0.15, 0.15, 0.17);
+    metalMat.specularColor = new Color3(0.5, 0.5, 0.5);
+    metalMat.specularPower = 64;
+
+    const darkMetalMat = new StandardMaterial('darkMetalMat', this.scene);
+    darkMetalMat.diffuseColor = new Color3(0.08, 0.08, 0.1);
+    darkMetalMat.specularColor = new Color3(0.3, 0.3, 0.3);
+
+    const handleMat = new StandardMaterial('handleMat', this.scene);
+    handleMat.diffuseColor = new Color3(0.25, 0.2, 0.15);
+    handleMat.specularColor = new Color3(0.1, 0.1, 0.1);
+
+    // Main body (receiver)
+    const body = MeshBuilder.CreateBox('gunBody', {
+      width: 0.06,
+      height: 0.08,
+      depth: 0.35,
     }, this.scene);
+    body.material = metalMat;
+    body.parent = gunParent;
+    body.position = new Vector3(0, 0, 0);
 
-    const gunMat = new StandardMaterial('gunMat', this.scene);
-    gunMat.diffuseColor = new Color3(0.2, 0.2, 0.2);
-    gunMat.specularColor = new Color3(0.3, 0.3, 0.3);
-    gun.material = gunMat;
+    // Barrel
+    const barrel = MeshBuilder.CreateCylinder('barrel', {
+      diameter: 0.025,
+      height: 0.4,
+    }, this.scene);
+    barrel.material = darkMetalMat;
+    barrel.parent = gunParent;
+    barrel.rotation.x = Math.PI / 2;
+    barrel.position = new Vector3(0, 0.02, 0.35);
 
-    // Attach to camera
-    gun.parent = this.camera;
-    gun.position = new Vector3(0.3, -0.2, 0.5);
-    gun.rotation = new Vector3(0, 0, 0);
+    // Barrel shroud
+    const shroud = MeshBuilder.CreateBox('shroud', {
+      width: 0.05,
+      height: 0.04,
+      depth: 0.25,
+    }, this.scene);
+    shroud.material = metalMat;
+    shroud.parent = gunParent;
+    shroud.position = new Vector3(0, 0.01, 0.2);
 
-    return gun;
+    // Magazine
+    const magazine = MeshBuilder.CreateBox('magazine', {
+      width: 0.04,
+      height: 0.12,
+      depth: 0.08,
+    }, this.scene);
+    magazine.material = darkMetalMat;
+    magazine.parent = gunParent;
+    magazine.position = new Vector3(0, -0.1, -0.02);
+
+    // Handle/Grip
+    const grip = MeshBuilder.CreateBox('grip', {
+      width: 0.045,
+      height: 0.1,
+      depth: 0.06,
+    }, this.scene);
+    grip.material = handleMat;
+    grip.parent = gunParent;
+    grip.rotation.x = -0.3;
+    grip.position = new Vector3(0, -0.08, -0.12);
+
+    // Stock
+    const stock = MeshBuilder.CreateBox('stock', {
+      width: 0.04,
+      height: 0.06,
+      depth: 0.2,
+    }, this.scene);
+    stock.material = handleMat;
+    stock.parent = gunParent;
+    stock.position = new Vector3(0, -0.01, -0.25);
+
+    // Sight rail
+    const rail = MeshBuilder.CreateBox('rail', {
+      width: 0.03,
+      height: 0.015,
+      depth: 0.15,
+    }, this.scene);
+    rail.material = metalMat;
+    rail.parent = gunParent;
+    rail.position = new Vector3(0, 0.05, 0.05);
+
+    // Front sight
+    const frontSight = MeshBuilder.CreateBox('frontSight', {
+      width: 0.008,
+      height: 0.025,
+      depth: 0.008,
+    }, this.scene);
+    frontSight.material = metalMat;
+    frontSight.parent = gunParent;
+    frontSight.position = new Vector3(0, 0.065, 0.12);
+
+    // Rear sight
+    const rearSight = MeshBuilder.CreateBox('rearSight', {
+      width: 0.025,
+      height: 0.02,
+      depth: 0.008,
+    }, this.scene);
+    rearSight.material = metalMat;
+    rearSight.parent = gunParent;
+    rearSight.position = new Vector3(0, 0.06, -0.02);
+
+    // Muzzle flash placeholder (initially invisible)
+    this.muzzleFlash = MeshBuilder.CreatePlane('muzzleFlash', { size: 0.15 }, this.scene);
+    const flashMat = new StandardMaterial('flashMat', this.scene);
+    flashMat.diffuseColor = new Color3(1, 0.8, 0.3);
+    flashMat.emissiveColor = new Color3(1, 0.6, 0.2);
+    flashMat.alpha = 0;
+    this.muzzleFlash.material = flashMat;
+    this.muzzleFlash.parent = gunParent;
+    this.muzzleFlash.position = new Vector3(0, 0.02, 0.55);
+    this.muzzleFlash.billboardMode = Mesh.BILLBOARDMODE_ALL;
+
+    return gunParent;
   }
+
+  private muzzleFlash!: Mesh;
 
   update(dt: number): void {
     // Handle mouse look
@@ -176,16 +283,16 @@ export class Player {
 
   private updateWeaponBob(dt: number, isMoving: boolean): void {
     if (isMoving) {
-      this.bobTime += dt * 10;
-      const bobX = Math.sin(this.bobTime) * 0.01;
-      const bobY = Math.abs(Math.cos(this.bobTime)) * 0.01;
-      this.weaponMesh.position.x = 0.3 + bobX;
-      this.weaponMesh.position.y = -0.2 + bobY;
+      this.bobTime += dt * 12;
+      const bobX = Math.sin(this.bobTime) * 0.012;
+      const bobY = Math.abs(Math.cos(this.bobTime * 2)) * 0.015;
+      this.weaponMesh.position.x = 0.35 + bobX;
+      this.weaponMesh.position.y = -0.25 + bobY;
     } else {
       // Subtle idle bob
       this.bobTime += dt * 2;
-      const idleBob = Math.sin(this.bobTime) * 0.002;
-      this.weaponMesh.position.y = -0.2 + idleBob;
+      const idleBob = Math.sin(this.bobTime) * 0.003;
+      this.weaponMesh.position.y = -0.25 + idleBob;
     }
   }
 
@@ -198,10 +305,23 @@ export class Player {
     this.lastShotTime = performance.now();
 
     // Recoil animation
-    this.weaponMesh.position.z -= 0.05;
+    this.weaponMesh.position.z -= 0.08;
+    this.weaponMesh.rotation.x = 0.1;
     setTimeout(() => {
-      this.weaponMesh.position.z = 0.5;
-    }, 50);
+      this.weaponMesh.position.z = 0.6;
+      this.weaponMesh.rotation.x = 0;
+    }, 60);
+
+    // Muzzle flash
+    if (this.muzzleFlash) {
+      const flashMat = this.muzzleFlash.material as StandardMaterial;
+      flashMat.alpha = 1;
+      this.muzzleFlash.scaling.setAll(1 + Math.random() * 0.3);
+      this.muzzleFlash.rotation.z = Math.random() * Math.PI * 2;
+      setTimeout(() => {
+        flashMat.alpha = 0;
+      }, 40);
+    }
   }
 
   getPosition(): Vector3 {
