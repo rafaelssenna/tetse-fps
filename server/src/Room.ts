@@ -16,7 +16,7 @@ import {
   MAPS,
   MAP_IDS,
 } from 'shared';
-import { GameServer } from './GameServer';
+import { GameServer } from './GameServer.js';
 
 interface RoomPlayer {
   id: PlayerId;

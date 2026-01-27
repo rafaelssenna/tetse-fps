@@ -11,8 +11,8 @@ import {
   GameMode,
   NETWORK,
 } from 'shared';
-import { Room } from './Room';
-import { Matchmaking } from './Matchmaking';
+import { Room } from './Room.js';
+import { Matchmaking } from './Matchmaking.js';
 
 interface ConnectedPlayer {
   id: PlayerId;

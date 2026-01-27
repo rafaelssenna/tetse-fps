@@ -5,7 +5,7 @@ import {
   MessageType,
   MATCH,
 } from 'shared';
-import { GameServer } from './GameServer';
+import { GameServer } from './GameServer.js';
 
 export class Matchmaking {
   private server: GameServer;
