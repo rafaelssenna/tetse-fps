@@ -103,6 +103,11 @@ export class NetworkManager {
   private handleMessage(message: ServerMessage): void {
     // Handle built-in messages
     switch (message.type) {
+      case MessageType.CONNECTED:
+        console.log('Connected with player ID:', message.playerId);
+        useGameStore.getState().setLocalPlayerId(message.playerId);
+        break;
+
       case MessageType.PONG:
         this.latency = Date.now() - message.timestamp;
         break;

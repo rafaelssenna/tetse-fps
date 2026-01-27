@@ -136,11 +136,11 @@ export class GameServer {
 
     console.log(`Player connected: ${player.name} (${playerId}) as ${characterId}`);
 
-    // Send confirmation
+    // Send confirmation with player ID
     this.sendToPlayer(playerId, {
-      type: MessageType.PONG,
+      type: MessageType.CONNECTED,
+      playerId: playerId,
       timestamp: Date.now(),
-      serverTime: Date.now(),
     });
   }
 

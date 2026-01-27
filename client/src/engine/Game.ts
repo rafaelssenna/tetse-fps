@@ -534,6 +534,10 @@ export class Game {
     // Visual effect (muzzle flash, etc.) could go here
   }
 
+  getInputManager(): InputManager {
+    return this.inputManager;
+  }
+
   dispose(): void {
     this.inputManager.dispose();
     this.remotePlayers.forEach(player => player.dispose());

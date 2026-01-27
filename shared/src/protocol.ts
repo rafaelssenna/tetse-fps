@@ -13,6 +13,7 @@ import {
 export enum MessageType {
   // Conexão
   CONNECT = 'connect',
+  CONNECTED = 'connected',
   DISCONNECT = 'disconnect',
   PING = 'ping',
   PONG = 'pong',
@@ -82,6 +83,12 @@ export interface PlayerShootMessage {
 }
 
 // ===== Mensagens do Servidor para Cliente =====
+
+export interface ConnectedMessage {
+  type: MessageType.CONNECTED;
+  playerId: PlayerId;
+  timestamp: number;
+}
 
 export interface PongMessage {
   type: MessageType.PONG;
@@ -204,6 +211,7 @@ export type ClientMessage =
   | PlayerShootMessage;
 
 export type ServerMessage =
+  | ConnectedMessage
   | PongMessage
   | QueueStatusMessage
   | MatchFoundMessage

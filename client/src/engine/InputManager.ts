@@ -19,8 +19,18 @@ export class InputManager {
   private boundHandleMouseMove: (e: MouseEvent) => void;
   private boundHandleContextMenu: (e: Event) => void;
 
+  // Mobile touch input state
+  private touchMoveX = 0;
+  private touchMoveY = 0;
+  private touchJump = false;
+  private touchShooting = false;
+  private isMobile = false;
+
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
+
+    // Detect mobile device
+    this.isMobile = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
 
     this.boundHandleKeyDown = this.handleKeyDown.bind(this);
     this.boundHandleKeyUp = this.handleKeyUp.bind(this);
@@ -35,6 +45,29 @@ export class InputManager {
     window.addEventListener('mouseup', this.boundHandleMouseUp);
     document.addEventListener('mousemove', this.boundHandleMouseMove);
     canvas.addEventListener('contextmenu', this.boundHandleContextMenu);
+  }
+
+  isMobileDevice(): boolean {
+    return this.isMobile;
+  }
+
+  // Touch input methods for mobile controls
+  setTouchMove(x: number, y: number): void {
+    this.touchMoveX = x;
+    this.touchMoveY = y;
+  }
+
+  setTouchLook(dx: number, dy: number): void {
+    this.mouseDeltaX += dx;
+    this.mouseDeltaY += dy;
+  }
+
+  setTouchShoot(shooting: boolean): void {
+    this.touchShooting = shooting;
+  }
+
+  triggerTouchJump(): void {
+    this.touchJump = true;
   }
 
   private handleKeyDown(e: KeyboardEvent): void {
@@ -70,17 +103,25 @@ export class InputManager {
   }
 
   getInput(): InputState {
+    // Combine keyboard and touch inputs
+    const jump = this.keys.has('Space') || this.touchJump;
+
+    // Reset touch jump after reading (one-shot)
+    if (this.touchJump) {
+      this.touchJump = false;
+    }
+
     return {
-      forward: this.keys.has('KeyW'),
-      backward: this.keys.has('KeyS'),
-      left: this.keys.has('KeyA'),
-      right: this.keys.has('KeyD'),
-      jump: this.keys.has('Space'),
+      forward: this.keys.has('KeyW') || this.touchMoveY > 0.3,
+      backward: this.keys.has('KeyS') || this.touchMoveY < -0.3,
+      left: this.keys.has('KeyA') || this.touchMoveX < -0.3,
+      right: this.keys.has('KeyD') || this.touchMoveX > 0.3,
+      jump,
     };
   }
 
   isMouseDown(): boolean {
-    return this.mouseDown;
+    return this.mouseDown || this.touchShooting;
   }
 
   consumeMouseDelta(): { x: number; y: number } {

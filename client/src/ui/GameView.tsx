@@ -1,8 +1,9 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { useGameStore } from '../store/gameStore';
 import { Game } from '../engine/Game';
 import HUD from './HUD';
 import Scoreboard from './Scoreboard';
+import MobileControls from './MobileControls';
 
 const styles: Record<string, React.CSSProperties> = {
   container: {
@@ -30,17 +31,24 @@ function GameView() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const gameRef = useRef<Game | null>(null);
   const { showScoreboard, currentMapId } = useGameStore();
+  const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
+    // Detect mobile device
+    const checkMobile = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+    setIsMobile(checkMobile);
+
     if (!canvasRef.current) return;
 
     const game = new Game(canvasRef.current);
     gameRef.current = game;
     game.start();
 
-    // Handle pointer lock
+    // Handle pointer lock (desktop only)
     const handleClick = () => {
-      canvasRef.current?.requestPointerLock();
+      if (!checkMobile) {
+        canvasRef.current?.requestPointerLock();
+      }
     };
 
     canvasRef.current.addEventListener('click', handleClick);
@@ -70,6 +78,23 @@ function GameView() {
     };
   }, []);
 
+  // Mobile control handlers
+  const handleMove = useCallback((x: number, y: number) => {
+    gameRef.current?.getInputManager()?.setTouchMove(x, y);
+  }, []);
+
+  const handleLook = useCallback((dx: number, dy: number) => {
+    gameRef.current?.getInputManager()?.setTouchLook(dx, dy);
+  }, []);
+
+  const handleShoot = useCallback((shooting: boolean) => {
+    gameRef.current?.getInputManager()?.setTouchShoot(shooting);
+  }, []);
+
+  const handleJump = useCallback(() => {
+    gameRef.current?.getInputManager()?.triggerTouchJump();
+  }, []);
+
   return (
     <div style={styles.container}>
       <canvas ref={canvasRef} style={styles.canvas} id="game-canvas" />
@@ -85,6 +110,16 @@ function GameView() {
 
       <HUD />
       {showScoreboard && <Scoreboard />}
+
+      {/* Mobile Controls */}
+      {isMobile && (
+        <MobileControls
+          onMove={handleMove}
+          onLook={handleLook}
+          onShoot={handleShoot}
+          onJump={handleJump}
+        />
+      )}
     </div>
   );
 }
