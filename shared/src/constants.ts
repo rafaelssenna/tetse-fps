@@ -2,8 +2,8 @@ import { Character, CharacterId, MapData, MapId } from './types.js';
 
 // ===== Configurações de Rede =====
 export const NETWORK = {
-  TICK_RATE: 20, // Atualizações por segundo do servidor
-  CLIENT_UPDATE_RATE: 60, // FPS alvo do cliente
+  TICK_RATE: 64, // Atualizações por segundo do servidor (64Hz)
+  CLIENT_UPDATE_RATE: 0, // 0 = FPS ilimitado
   INTERPOLATION_DELAY: 100, // ms de delay para interpolação
   MAX_PREDICTION_FRAMES: 10, // Máximo de frames para client-side prediction
 } as const;

@@ -174,7 +174,7 @@ export class RemotePlayer {
       Math.abs(state.position.y - this.lastReceivedPosition.y) > 0.001 ||
       Math.abs(state.position.z - this.lastReceivedPosition.z) > 0.001;
 
-    // On first state, set position immediately (no interpolation)
+    // On first state, set position immediately AND add to buffer
     if (!this.hasReceivedFirstState) {
       this.hasReceivedFirstState = true;
       this.currentPosition = newPosition.clone();
@@ -183,8 +183,16 @@ export class RemotePlayer {
       this.targetRotation = state.rotation.x;
       this.root.position.copyFrom(this.currentPosition);
       this.root.rotation.y = this.currentRotation;
-      this.lastReceivedPosition = { ...state.position };
       console.log('[RemotePlayer] First state received, position:', state.position);
+
+      // Add first state to buffer so interpolation has data
+      this.interpolationBuffer.push({
+        position: newPosition.clone(),
+        rotation: state.rotation.x,
+        timestamp: Date.now(),
+      });
+      this.lastReceivedPosition = { ...state.position };
+      return;
     }
 
     // Only add to buffer if position changed (new server state)
@@ -192,9 +200,9 @@ export class RemotePlayer {
       this.updateCount++;
       this.lastReceivedPosition = { ...state.position };
 
-      // Debug log every 20 actual updates (once per second)
-      if (this.updateCount % 20 === 0) {
-        console.log(`[RemotePlayer ${this.id.substring(0, 8)}] Update #${this.updateCount} pos=(${state.position.x.toFixed(1)}, ${state.position.z.toFixed(1)}) mesh=(${this.root.position.x.toFixed(1)}, ${this.root.position.z.toFixed(1)})`);
+      // Debug log every 10 actual updates
+      if (this.updateCount % 10 === 0) {
+        console.log(`[RemotePlayer ${this.id.substring(0, 8)}] Update #${this.updateCount} pos=(${state.position.x.toFixed(1)}, ${state.position.z.toFixed(1)}) mesh=(${this.root.position.x.toFixed(1)}, ${this.root.position.z.toFixed(1)}) bufLen=${this.interpolationBuffer.length}`);
       }
 
       // Add to interpolation buffer
@@ -204,8 +212,8 @@ export class RemotePlayer {
         timestamp: Date.now(),
       });
 
-      // Keep only recent states
-      const cutoff = Date.now() - NETWORK.INTERPOLATION_DELAY * 2;
+      // Keep only recent states (last 500ms for smoother interpolation)
+      const cutoff = Date.now() - 500;
       this.interpolationBuffer = this.interpolationBuffer.filter(
         s => s.timestamp > cutoff
       );
@@ -222,7 +230,9 @@ export class RemotePlayer {
   }
 
   private interpolate(): void {
-    const renderTime = Date.now() - NETWORK.INTERPOLATION_DELAY;
+    // Use a smaller delay (50ms = 1 tick at 20Hz)
+    const interpolationDelay = 50;
+    const renderTime = Date.now() - interpolationDelay;
 
     // Find two states to interpolate between
     let beforeState = null;
@@ -243,21 +253,27 @@ export class RemotePlayer {
       // Calculate interpolation factor
       const total = afterState.timestamp - beforeState.timestamp;
       const progress = renderTime - beforeState.timestamp;
-      const t = total > 0 ? progress / total : 0;
+      const t = Math.min(1, Math.max(0, total > 0 ? progress / total : 0));
 
       // Interpolate position
       this.targetPosition = Vector3.Lerp(beforeState.position, afterState.position, t);
       this.targetRotation = this.lerpAngle(beforeState.rotation, afterState.rotation, t);
     } else if (this.interpolationBuffer.length > 0) {
-      // Use latest state
+      // Use latest state directly
       const latest = this.interpolationBuffer[this.interpolationBuffer.length - 1];
       this.targetPosition = latest.position.clone();
       this.targetRotation = latest.rotation;
     }
 
+    // Calculate distance to target for adaptive smoothing
+    const distance = Vector3.Distance(this.currentPosition, this.targetPosition);
+
+    // Use faster lerp (0.5) for snappier movement, even faster (0.8) if far behind
+    const lerpFactor = distance > 2 ? 0.8 : 0.5;
+
     // Smooth current position towards target
-    this.currentPosition = Vector3.Lerp(this.currentPosition, this.targetPosition, 0.2);
-    this.currentRotation = this.lerpAngle(this.currentRotation, this.targetRotation, 0.2);
+    this.currentPosition = Vector3.Lerp(this.currentPosition, this.targetPosition, lerpFactor);
+    this.currentRotation = this.lerpAngle(this.currentRotation, this.targetRotation, lerpFactor);
 
     // Apply to mesh
     this.root.position.copyFrom(this.currentPosition);

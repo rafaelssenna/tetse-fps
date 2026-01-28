@@ -35,6 +35,13 @@ export class Game {
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
+
+    // DEBUG: Check store state when Game is created
+    const store = useGameStore.getState();
+    console.log('🎮 [Game] Constructor - localPlayerId:', store.localPlayerId);
+    console.log('🎮 [Game] Constructor - players in store:', store.players.size);
+    console.log('🎮 [Game] Constructor - isPlaying:', store.isPlaying);
+
     this.engine = new Engine(canvas, true, {
       preserveDrawingBuffer: true,
       stencil: true,
@@ -489,7 +496,7 @@ export class Game {
   }
 
   private lastInputSendTime = 0;
-  private inputSendInterval = 1000 / 20; // Send at 20Hz to match server tick rate
+  private inputSendInterval = 1000 / 64; // Send at 64Hz to match server tick rate
 
   private sendInputToServer(): void {
     const now = performance.now();
@@ -523,25 +530,49 @@ export class Game {
     });
   }
 
+  private remoteUpdateCount = 0;
+  private lastRemotePlayerCount = 0;
+
   private updateRemotePlayers(): void {
     const store = useGameStore.getState();
     const players = store.players;
+    const localPlayerId = store.localPlayerId;
 
-    // Debug: log once when we have other players
-    if (players.size > 1 && this.remotePlayers.size === 0) {
-      console.log('[Game] Found players:', players.size, 'localId:', store.localPlayerId);
-      players.forEach((p, id) => {
-        console.log('[Game] Player:', id, 'isLocal:', id === store.localPlayerId, 'pos:', p.position);
-      });
+    // CRITICAL: Check if we have a localPlayerId
+    if (!localPlayerId) {
+      if (this.remoteUpdateCount % 60 === 0) {
+        console.warn('[Game] WARNING: localPlayerId is NULL, skipping remote player update');
+      }
+      this.remoteUpdateCount++;
+      return;
+    }
+
+    // Debug log every 60 frames (1 second at 60fps)
+    this.remoteUpdateCount++;
+    const shouldLog = this.remoteUpdateCount % 60 === 0;
+
+    // Count remote players (excluding local)
+    let remoteCount = 0;
+    players.forEach((_, id) => {
+      if (id !== localPlayerId) remoteCount++;
+    });
+
+    // Log when remote player count changes
+    if (remoteCount !== this.lastRemotePlayerCount) {
+      console.log(`[Game] Remote player count changed: ${this.lastRemotePlayerCount} -> ${remoteCount} (localId=${localPlayerId.substring(0, 8)})`);
+      this.lastRemotePlayerCount = remoteCount;
     }
 
     // Update or create remote players
     players.forEach((playerState, playerId) => {
-      if (playerId === store.localPlayerId) return;
+      // Skip local player
+      if (playerId === localPlayerId) {
+        return;
+      }
 
       let remotePlayer = this.remotePlayers.get(playerId);
       if (!remotePlayer) {
-        console.log('[Game] Creating RemotePlayer for:', playerId, 'at pos:', playerState.position);
+        console.log(`[Game] Creating RemotePlayer for: ${playerId.substring(0, 8)} (I am ${localPlayerId.substring(0, 8)}) at pos:`, playerState.position);
         const character = CHARACTERS[playerState.characterId];
         remotePlayer = new RemotePlayer(
           this.scene,
@@ -551,12 +582,19 @@ export class Game {
         this.remotePlayers.set(playerId, remotePlayer);
       }
 
+      // Debug: show store position vs mesh position
+      if (shouldLog && this.remotePlayers.size > 0) {
+        const meshPos = remotePlayer.getPosition();
+        console.log(`[Game] Remote ${playerId.substring(0, 8)}: store=(${playerState.position.x.toFixed(1)}, ${playerState.position.z.toFixed(1)}) mesh=(${meshPos.x.toFixed(1)}, ${meshPos.z.toFixed(1)})`);
+      }
+
       remotePlayer.updateState(playerState);
     });
 
     // Remove disconnected players
     this.remotePlayers.forEach((remotePlayer, playerId) => {
       if (!players.has(playerId)) {
+        console.log('[Game] Removing disconnected player:', playerId);
         remotePlayer.dispose();
         this.remotePlayers.delete(playerId);
       }

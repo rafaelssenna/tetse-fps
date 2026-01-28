@@ -104,8 +104,11 @@ export class NetworkManager {
     // Handle built-in messages
     switch (message.type) {
       case MessageType.CONNECTED:
-        console.log('Connected with player ID:', message.playerId);
+        console.log('✅ [CONNECTED] Received player ID:', message.playerId);
         useGameStore.getState().setLocalPlayerId(message.playerId);
+        // Verify it was set
+        const verifyId = useGameStore.getState().localPlayerId;
+        console.log('✅ [CONNECTED] Verified localPlayerId in store:', verifyId);
         break;
 
       case MessageType.PONG:
@@ -172,9 +175,15 @@ export class NetworkManager {
 
     this.gameStateCount++;
 
-    // Debug log every 20 states (once per second at 20Hz)
-    if (this.gameStateCount % 20 === 0) {
-      console.log(`[GAME_STATE] #${this.gameStateCount} tick=${snapshot.tick} players=${snapshot.players.length}`);
+    // CRITICAL: Check if localPlayerId is set
+    if (!store.localPlayerId) {
+      console.warn('[NetworkManager] WARNING: localPlayerId is NULL! Cannot process GAME_STATE correctly.');
+      return; // Skip processing until we have our ID
+    }
+
+    // Debug log every 10 states (twice per second at 20Hz)
+    if (this.gameStateCount % 10 === 0) {
+      console.log(`[NetworkManager] GAME_STATE #${this.gameStateCount} tick=${snapshot.tick} players=${snapshot.players.length} localId=${store.localPlayerId?.substring(0, 8)}`);
       snapshot.players.forEach((p: any) => {
         const isLocal = p.id === store.localPlayerId;
         console.log(`  - ${p.id.substring(0, 8)}${isLocal ? ' (LOCAL)' : ''}: pos=(${p.position.x.toFixed(1)}, ${p.position.y.toFixed(1)}, ${p.position.z.toFixed(1)})`);
@@ -182,7 +191,7 @@ export class NetworkManager {
     }
 
     // Update players
-    const playersMap = new Map();
+    const playersMap = new Map<string, any>();
     snapshot.players.forEach((player: any) => {
       playersMap.set(player.id, player);
 
@@ -192,6 +201,12 @@ export class NetworkManager {
         store.setScore(player.kills, player.deaths);
       }
     });
+
+    // Debug: confirm store update
+    if (this.gameStateCount % 10 === 0) {
+      console.log(`[NetworkManager] Updating store with ${playersMap.size} players`);
+    }
+
     store.setPlayers(playersMap);
   }
 
