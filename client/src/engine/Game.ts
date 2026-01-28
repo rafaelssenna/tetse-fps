@@ -31,6 +31,7 @@ export class Game {
   private network: NetworkManager;
   private lastUpdateTime = 0;
   private inputSequence = 0;
+  private hasAppliedSpawnPoint = false;
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -440,6 +441,20 @@ export class Game {
     return ramp;
   }
 
+  private checkAndApplySpawnPoint(): void {
+    const store = useGameStore.getState();
+    const spawnPoint = store.spawnPoint;
+
+    // Apply spawn point whenever it's set (initial spawn or respawn)
+    if (spawnPoint) {
+      console.log('🎯 [Game] Applying spawn point:', spawnPoint);
+      this.player.setPosition(spawnPoint.x, spawnPoint.y, spawnPoint.z);
+      this.hasAppliedSpawnPoint = true;
+      // Clear spawn point from store after applying
+      store.setSpawnPoint(null);
+    }
+  }
+
   start(): void {
     // Start render loop
     this.engine.runRenderLoop(() => {
@@ -452,6 +467,9 @@ export class Game {
     const now = performance.now();
     const dt = Math.min((now - this.lastUpdateTime) / 1000, 0.1); // Cap at 100ms
     this.lastUpdateTime = now;
+
+    // Check for spawn point and apply it once
+    this.checkAndApplySpawnPoint();
 
     // Update player
     this.player.update(dt);
@@ -470,12 +488,27 @@ export class Game {
     }
   }
 
+  private lastInputSendTime = 0;
+  private inputSendInterval = 1000 / 20; // Send at 20Hz to match server tick rate
+
   private sendInputToServer(): void {
+    const now = performance.now();
+    // Throttle input sending to server tick rate (20Hz)
+    if (now - this.lastInputSendTime < this.inputSendInterval) {
+      return;
+    }
+    this.lastInputSendTime = now;
+
     const input = this.inputManager.getInput();
     const cameraRotation = {
       x: this.camera.rotation.y,
       y: this.camera.rotation.x,
     };
+
+    // Debug log every second (every 20 sends)
+    if (this.inputSequence % 20 === 0) {
+      console.log(`[Game] Sending input #${this.inputSequence} fwd=${input.forward} pos=(${this.camera.position.x.toFixed(1)}, ${this.camera.position.z.toFixed(1)})`);
+    }
 
     this.network.sendInput({
       sequenceNumber: this.inputSequence++,

@@ -236,7 +236,17 @@ export class Room {
 
   handlePlayerInput(playerId: PlayerId, input: PlayerInput): void {
     const player = this.players.get(playerId);
-    if (!player || this.status !== 'playing') return;
+    if (!player) {
+      console.log(`[Room] Input rejected - player ${playerId} not found`);
+      return;
+    }
+    if (this.status !== 'playing') {
+      // Only log occasionally to avoid spam
+      if (Math.random() < 0.01) {
+        console.log(`[Room] Input rejected - game status: ${this.status}`);
+      }
+      return;
+    }
 
     player.pendingInputs.push(input);
   }
@@ -475,6 +485,8 @@ export class Room {
     const state = player.state;
     const dt = 1 / 20; // 50ms per tick
 
+    const oldPos = { ...state.position };
+
     // Update rotation
     state.rotation = input.rotation;
 
@@ -530,6 +542,13 @@ export class Room {
       state.velocity.y = 0;
     }
 
+    // Debug: log if position changed significantly
+    const moved = Math.abs(state.position.x - oldPos.x) > 0.01 ||
+                  Math.abs(state.position.z - oldPos.z) > 0.01;
+    if (moved && Math.random() < 0.1) { // 10% chance to log to avoid spam
+      console.log(`[Room] Player ${player.id.substring(0, 8)} moved: (${oldPos.x.toFixed(1)},${oldPos.z.toFixed(1)}) -> (${state.position.x.toFixed(1)},${state.position.z.toFixed(1)})`);
+    }
+
     player.lastInput = input;
   }
 
@@ -542,6 +561,14 @@ export class Room {
     };
 
     this.events = []; // Clear events after sending
+
+    // Debug log every second (every 20 ticks)
+    if (this.tick_count % 20 === 0) {
+      console.log(`[Room] Broadcasting GAME_STATE tick=${this.tick_count} players=${snapshot.players.length}`);
+      snapshot.players.forEach(p => {
+        console.log(`  - ${p.id.substring(0, 8)}: pos=(${p.position.x.toFixed(1)}, ${p.position.y.toFixed(1)}, ${p.position.z.toFixed(1)})`);
+      });
+    }
 
     this.broadcast({
       type: MessageType.GAME_STATE,

@@ -30,6 +30,8 @@ export class RemotePlayer {
 
   private isAlive = true;
   private hasReceivedFirstState = false;
+  private updateCount = 0;
+  private lastReceivedPosition = { x: 0, y: 0, z: 0 };
 
   constructor(scene: Scene, id: string, color: string) {
     this.scene = scene;
@@ -166,6 +168,12 @@ export class RemotePlayer {
   updateState(state: PlayerState): void {
     const newPosition = new Vector3(state.position.x, state.position.y, state.position.z);
 
+    // Check if position actually changed (avoid duplicate buffer entries)
+    const positionChanged =
+      Math.abs(state.position.x - this.lastReceivedPosition.x) > 0.001 ||
+      Math.abs(state.position.y - this.lastReceivedPosition.y) > 0.001 ||
+      Math.abs(state.position.z - this.lastReceivedPosition.z) > 0.001;
+
     // On first state, set position immediately (no interpolation)
     if (!this.hasReceivedFirstState) {
       this.hasReceivedFirstState = true;
@@ -175,21 +183,33 @@ export class RemotePlayer {
       this.targetRotation = state.rotation.x;
       this.root.position.copyFrom(this.currentPosition);
       this.root.rotation.y = this.currentRotation;
+      this.lastReceivedPosition = { ...state.position };
       console.log('[RemotePlayer] First state received, position:', state.position);
     }
 
-    // Add to interpolation buffer
-    this.interpolationBuffer.push({
-      position: newPosition,
-      rotation: state.rotation.x,
-      timestamp: Date.now(),
-    });
+    // Only add to buffer if position changed (new server state)
+    if (positionChanged) {
+      this.updateCount++;
+      this.lastReceivedPosition = { ...state.position };
 
-    // Keep only recent states
-    const cutoff = Date.now() - NETWORK.INTERPOLATION_DELAY * 2;
-    this.interpolationBuffer = this.interpolationBuffer.filter(
-      s => s.timestamp > cutoff
-    );
+      // Debug log every 20 actual updates (once per second)
+      if (this.updateCount % 20 === 0) {
+        console.log(`[RemotePlayer ${this.id.substring(0, 8)}] Update #${this.updateCount} pos=(${state.position.x.toFixed(1)}, ${state.position.z.toFixed(1)}) mesh=(${this.root.position.x.toFixed(1)}, ${this.root.position.z.toFixed(1)})`);
+      }
+
+      // Add to interpolation buffer
+      this.interpolationBuffer.push({
+        position: newPosition,
+        rotation: state.rotation.x,
+        timestamp: Date.now(),
+      });
+
+      // Keep only recent states
+      const cutoff = Date.now() - NETWORK.INTERPOLATION_DELAY * 2;
+      this.interpolationBuffer = this.interpolationBuffer.filter(
+        s => s.timestamp > cutoff
+      );
+    }
 
     // Update alive state
     if (state.isAlive !== this.isAlive) {
@@ -197,7 +217,7 @@ export class RemotePlayer {
       this.setVisible(state.isAlive);
     }
 
-    // Perform interpolation
+    // Always perform interpolation (smooth movement between frames)
     this.interpolate();
   }
 

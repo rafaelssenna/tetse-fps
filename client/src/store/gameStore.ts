@@ -47,6 +47,8 @@ interface GameState {
   // Game status
   isPlaying: boolean;
   setIsPlaying: (playing: boolean) => void;
+  spawnPoint: { x: number; y: number; z: number } | null;
+  setSpawnPoint: (point: { x: number; y: number; z: number } | null) => void;
   timeRemaining: number;
   setTimeRemaining: (time: number) => void;
 
@@ -74,6 +76,7 @@ const initialState = {
   kills: 0,
   deaths: 0,
   isPlaying: false,
+  spawnPoint: null as { x: number; y: number; z: number } | null,
   timeRemaining: 300,
   showScoreboard: false,
 };
@@ -107,6 +110,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   setAmmo: (ammo) => set({ ammo }),
   setScore: (kills, deaths) => set({ kills, deaths }),
   setIsPlaying: (isPlaying) => set({ isPlaying }),
+  setSpawnPoint: (spawnPoint) => set({ spawnPoint }),
   setTimeRemaining: (timeRemaining) => set({ timeRemaining }),
   setShowScoreboard: (showScoreboard) => set({ showScoreboard }),
 

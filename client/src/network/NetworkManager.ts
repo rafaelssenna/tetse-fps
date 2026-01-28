@@ -143,7 +143,11 @@ export class NetworkManager {
         break;
 
       case MessageType.GAME_START:
-        console.log('[GAME_START] Game starting! Map:', message.mapId, 'SpawnPoint:', message.yourSpawnPoint);
+        console.log('🎮 [GAME_START] Game starting! Map:', message.mapId, 'SpawnPoint:', message.yourSpawnPoint);
+        console.log('🎮 [GAME_START] LocalPlayerId:', useGameStore.getState().localPlayerId);
+        if (message.yourSpawnPoint) {
+          useGameStore.getState().setSpawnPoint(message.yourSpawnPoint);
+        }
         useGameStore.getState().setIsPlaying(true);
         break;
 
@@ -160,13 +164,21 @@ export class NetworkManager {
     }
   }
 
+  private gameStateCount = 0;
+
   private handleGameState(message: any): void {
     const store = useGameStore.getState();
     const snapshot = message.snapshot;
 
-    // Debug log
-    if (snapshot.players.length > 1) {
-      console.log('[GAME_STATE] Players:', snapshot.players.length, 'LocalID:', store.localPlayerId);
+    this.gameStateCount++;
+
+    // Debug log every 20 states (once per second at 20Hz)
+    if (this.gameStateCount % 20 === 0) {
+      console.log(`[GAME_STATE] #${this.gameStateCount} tick=${snapshot.tick} players=${snapshot.players.length}`);
+      snapshot.players.forEach((p: any) => {
+        const isLocal = p.id === store.localPlayerId;
+        console.log(`  - ${p.id.substring(0, 8)}${isLocal ? ' (LOCAL)' : ''}: pos=(${p.position.x.toFixed(1)}, ${p.position.y.toFixed(1)}, ${p.position.z.toFixed(1)})`);
+      });
     }
 
     // Update players
@@ -199,6 +211,11 @@ export class NetworkManager {
     const store = useGameStore.getState();
     if (message.playerId === store.localPlayerId) {
       store.setHealth(100);
+      // Set new spawn point for respawn
+      if (message.position) {
+        console.log('🎯 [PLAYER_SPAWN] Respawning at:', message.position);
+        store.setSpawnPoint(message.position);
+      }
     }
   }
 
